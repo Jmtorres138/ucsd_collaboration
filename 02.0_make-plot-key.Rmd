@@ -1,0 +1,41 @@
+---
+title: "03.0_make-plot-key.Rmd"
+author: "Jason Torres"
+date: "January 29, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+NOTE: Only need to run this if there is an annotation key file for the fgwas input file (i.e. A1, A2, etc.)
+
+
+# Setup 
+
+```{r}
+
+
+"%&%" <- function(a,b) paste0(a,b)
+library("data.table")
+library("tidyverse")
+library("gridExtra")
+library("viridis")
+
+serv.dir <- "/Users/jtorres/FUSE/"
+fgwas.dir <- serv.dir %&% "projects/t2d-integration/fgwas/diagram_hrc/cross_tissue/multi_tissue_joint_analysis/"
+annot.file <- fgwas.dir %&% "fgwas_input/annotation_key-file.txt"
+plot.dir <- fgwas.dir %&% "plots/"
+
+```
+
+```{r}
+
+df <- fread(annot.file)
+names(df) <- c("Name","PlotName")
+write.table(df,plot.dir %&% "plot-key.csv",sep=",",quote=FALSE,row.names=FALSE)
+
+```
+
