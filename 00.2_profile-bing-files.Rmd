@@ -1,0 +1,80 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup 
+
+```{r}
+"%&%" <- function(a,b) paste0(a,b)
+
+library("data.table")
+library("tidyverse")
+
+fuse.path <- "/home/jason/science/servers/FUSE5/"
+work.dir <- fuse.path %&% "projects/ucsd_collaboration/"
+bing.dir <- fuse.path %&% "datasets/bing/"
+part.dir <- fuse.path %&% "projects/t2d_classification/analysis_files/"
+atac.dir <- "/home/jason/science/servers/FUSE/reference/islet/atac_peaks/"
+
+```
+
+```{r}
+
+pb.df <- fread(bing.dir %&% "pbsnp_score_full.txt")
+pb.df <- na.omit(pb.df)
+
+pa.gr <- GRanges(seqnames=pa.df$chrom,IRanges(pa.df$pos,pa.df$pos))
+pb.gr <- GRanges(seqnames=pb.df$CHR,IRanges(pb.df$POS,pb.df$POS))
+
+```
+
+```{r}
+
+library("GenomicRanges")
+
+atac.df <- fread(atac.dir %&% "oxford_islet_atac_macs2_n17.bed")
+spec.df <- fread(part.dir %&% "specific_processed.txt")
+share.df <- fread(part.dir %&% "shared_processed.txt")
+atac.gr <- GRanges(seqnames=atac.df$V1,IRanges(atac.df$V2,atac.df$V3))
+
+isl1.gr <- filter(spec.df,V4=="islet_specific_strong_enhancer")
+isl1.gr <- GRanges(seqnames=isl1.gr$V1,IRanges(isl1.gr$V2,isl1.gr$V3))
+isl2.gr <- filter(share.df,grepl("strong_enhancer",V4)) %>% 
+    filter(.,grepl("islet",V4))
+isl2.gr <- GRanges(seqnames=isl2.gr$V1,IRanges(isl2.gr$V2,isl2.gr$V3))
+isl.gr <- c(isl1.gr,isl2.gr)
+
+liv1.gr <- filter(spec.df,V4=="liver_specific_strong_enhancer")
+liv1.gr <- GRanges(seqnames=liv1.gr$V1,IRanges(liv1.gr$V2,liv1.gr$V3))
+liv2.gr <- filter(share.df,grepl("strong_enhancer",V4)) %>% 
+    filter(.,grepl("liver",V4))
+liv2.gr <- GRanges(seqnames=liv2.gr$V1,IRanges(liv2.gr$V2,liv2.gr$V3))
+liv.gr <- c(liv1.gr,liv2.gr)
+
+```
+
+
+```{r}
+
+pa.df$islet_atac <- pa.gr %over% atac.gr
+pa.df$islet_enhancer_strong <- pa.gr %over% isl.gr
+pa.df$liver_enhancer_strong <- pa.gr %over% liv.gr
+
+write.table(x=pa.df,file=bing.dir%&%"paSNP-annotated.txt",sep="\t",quote=FALSE,
+            row.names=FALSE)
+
+pb.df$islet_atac <- pb.gr %over% atac.gr
+pb.df$islet_enhancer_strong <- pb.gr %over% isl.gr
+pb.df$liver_enhancer_strong <- pb.gr %over% liv.gr
+
+write.table(x=pb.df,file=bing.dir%&%"pbSNP-annotated.txt",sep="\t",quote=FALSE,
+            row.names=FALSE)
+
+```
+
+
