@@ -1,0 +1,107 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup 
+
+
+```{r}
+
+"%&%" <- function(a,b) paste0(a,b)
+
+library("data.table")
+library("tidyverse")
+
+fuse.path <- "/home/jason/science/servers/FUSE5/"
+work.dir <- fuse.path %&% "projects/ucsd_collaboration/"
+data.dir <- fuse.path %&% "datasets/bing/"
+
+
+```
+
+
+```{r}
+
+pb.df <- fread(data.dir %&% "pbsnp.score.tsv")
+pb.snps <- fread("cat " %&% data.dir %&% 
+                   "snp_keyfile.txt.gz" %&% " | zmore")
+
+pa.df <- fread(data.dir %&% "paSNP.tsv")
+loop.df <- fread(data.dir %&% "islet.loop.tsv")
+
+
+```
+
+
+```{r}
+
+names(pb.df)[names(pb.df)=="snp"] <- "RSID"
+pb.df <- filter(pb.df,pval<=0.05)
+pb.full <- inner_join(pb.df,pb.snps,by="RSID")
+
+pb.all <- dplyr::select(pb.full,one_of("CHR","POS"))
+pb.all <- pb.all[!duplicated(pb.all$POS),]
+pb.all$POS1 <- pb.all$POS
+pb.all$name <- "pb_allsig"
+
+out.df <- c()
+tf.vec <- pb.full$tf %>% unique(.)
+pb <- txtProgressBar(min=0,max=length(tf.vec),style=3)
+for (i in 1:length(tf.vec)){
+  setTxtProgressBar(pb,i)
+  tfac <- tf.vec[i]
+  sub.df <- filter(pb.full,tf==tfac)
+  sub.df <- sub.df[!duplicated(sub.df$POS),]
+  sub.df <- dplyr::select(sub.df,one_of("CHR","POS"))
+  sub.df$POS1 <- sub.df$POS
+  sub.df$name <- "pb_" %&% tfac
+  out.df <- rbind(out.df,sub.df)
+}
+
+
+```
+
+
+```{r}
+
+hep.df <- filter(pa.df,paSNP==1,cell=="HepG2") %>% 
+  dplyr::select(.,one_of("chrom","pos"))
+hep.df$POS1 <- hep.df$pos
+hep.df$name <- "pa_HepG2"
+names(hep.df) <- c("CHR","POS","POS1","name")
+
+hek.df <- filter(pa.df,paSNP==1,cell=="Hek293") %>% 
+  dplyr::select(.,one_of("chrom","pos"))
+hek.df$POS1 <- hek.df$pos
+hek.df$name <- "pa_Hek293"
+names(hek.df) <- c("CHR","POS","POS1","name")
+```
+
+
+```{r}
+
+loop1.df <- dplyr::select(loop.df,one_of("chr1","x1","x2"))
+loop1.df$name <- "loop_point1"
+names(loop1.df) <- c("CHR","POS","POS1","name") 
+
+loop2.df <- dplyr::select(loop.df,one_of("chr2","y1","y2"))
+loop2.df$name <- "loop_point2"
+names(loop2.df) <- c("CHR","POS","POS1","name") 
+
+loop.all <- rbind(loop1.df,loop2.df)
+
+```
+
+
+```{r}
+
+bing.df <- rbind(pb.all,out.df,hep.df,hek.df,loop1.df,loop2.df,loop.all)
+write.table(x=na.omit(bing.df),file=data.dir %&% "bing.bed",sep="\t",row.names=FALSE,
+            col.names=FALSE,quote=FALSE)
+```
+
