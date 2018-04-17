@@ -199,7 +199,7 @@ l7$name <- "loop_Not_liver_SE"
 
 loop.fgwas <- rbind(l1,l2,l3,l4,l5,l6,l7)
 write.table(x=loop.fgwas,file=bing.dir%&%"loops.bed",sep="\t",quote=FALSE,
-            row.names=FALSE)
+            row.names=FALSE,col.names=FALSE)
 
 
 ```
