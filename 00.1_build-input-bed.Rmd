@@ -33,7 +33,8 @@ pb.snps <- fread("cat " %&% data.dir %&%
 
 pa.df <- fread(data.dir %&% "paSNP.tsv")
 loop.df <- fread(data.dir %&% "islet.loop.tsv")
-
+loop.df$chr1 <- "chr" %&% loop.df$chr1 
+loop.df$chr2 <- "chr" %&% loop.df$chr2 
 
 ```
 

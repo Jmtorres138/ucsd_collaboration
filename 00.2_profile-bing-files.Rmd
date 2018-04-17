@@ -18,6 +18,7 @@ library("tidyverse")
 fuse.path <- "/home/jason/science/servers/FUSE5/"
 work.dir <- fuse.path %&% "projects/ucsd_collaboration/"
 bing.dir <- fuse.path %&% "datasets/bing/"
+hrc.dir <- fuse.path %&% "datasets/diamante_hrc/credible_sets/"
 part.dir <- fuse.path %&% "projects/t2d_classification/analysis_files/"
 atac.dir <- "/home/jason/science/servers/FUSE/reference/islet/atac_peaks/"
 
@@ -27,9 +28,22 @@ atac.dir <- "/home/jason/science/servers/FUSE/reference/islet/atac_peaks/"
 
 pb.df <- fread(bing.dir %&% "pbsnp_score_full.txt")
 pb.df <- na.omit(pb.df)
+pa.df <- fread(bing.dir %&% "paSNP.tsv")
+loop.df <- fread(bing.dir %&% "islet.loop.tsv")
+loop1.df <- select(loop.df,one_of("chr1","x1","x2"))
+names(loop1.df) <- c("CHR","POS","POS1")
+loop2.df <- select(loop.df,one_of("chr2","y1","y2"))
+names(loop2.df) <- c("CHR","POS","POS1")
+loop.bed <- rbind(loop1.df,loop2.df)
+loop.bed <- loop.bed[!duplicated(loop.bed),]
+loop.bed$CHR <- "chr" %&% loop.bed$CHR
+loop.bed$name <- "hiC_loop"
 
 pa.gr <- GRanges(seqnames=pa.df$chrom,IRanges(pa.df$pos,pa.df$pos))
 pb.gr <- GRanges(seqnames=pb.df$CHR,IRanges(pb.df$POS,pb.df$POS))
+loop.gr <-  GRanges(seqnames=loop.bed$CHR,IRanges(loop.bed$POS,loop.bed$POS1))
+
+
 
 ```
 
@@ -56,6 +70,8 @@ liv2.gr <- filter(share.df,grepl("strong_enhancer",V4)) %>%
 liv2.gr <- GRanges(seqnames=liv2.gr$V1,IRanges(liv2.gr$V2,liv2.gr$V3))
 liv.gr <- c(liv1.gr,liv2.gr)
 
+cred.df <- fread(hrc.dir %&% "combined.bed")
+cred.gr <- GRanges(seqnames=cred.df$V1,IRanges(start=cred.df$V2,cred.df$V3))
 ```
 
 
@@ -64,6 +80,7 @@ liv.gr <- c(liv1.gr,liv2.gr)
 pa.df$islet_atac <- pa.gr %over% atac.gr
 pa.df$islet_enhancer_strong <- pa.gr %over% isl.gr
 pa.df$liver_enhancer_strong <- pa.gr %over% liv.gr
+pa.df$credible <- pa.gr %over% cred.gr
 
 write.table(x=pa.df,file=bing.dir%&%"paSNP-annotated.txt",sep="\t",quote=FALSE,
             row.names=FALSE)
@@ -71,10 +88,118 @@ write.table(x=pa.df,file=bing.dir%&%"paSNP-annotated.txt",sep="\t",quote=FALSE,
 pb.df$islet_atac <- pb.gr %over% atac.gr
 pb.df$islet_enhancer_strong <- pb.gr %over% isl.gr
 pb.df$liver_enhancer_strong <- pb.gr %over% liv.gr
+pb.df$credible <- pb.gr %over% cred.gr
 
 write.table(x=pb.df,file=bing.dir%&%"pbSNP-annotated.txt",sep="\t",quote=FALSE,
             row.names=FALSE)
 
+
+loop.bed$islet_atac <- loop.gr %over% atac.gr
+loop.bed$islet_enhancer_strong <- loop.gr %over% isl.gr
+loop.bed$liver_enhancer_strong <- loop.gr %over% liv.gr
+loop.bed$credible <- loop.gr %over% cred.gr
+
+write.table(x=loop.bed,file=bing.dir%&%"loop-annotated.txt",sep="\t",quote=FALSE,
+            row.names=FALSE)
+
+```
+
+# Profiling 
+
+STAR-seq (pa.df)
+```{r}
+
+sig <- filter(pa.df,cell=="HepG2",paSNP==1) %>%  
+  dplyr::select(.,one_of("chrom","pos","islet_atac","islet_enhancer_strong","liver_enhancer_strong","credible"))
+sig <- sig[!duplicated(sig),]
+sig$islet_atac %>% sum(.)
+sig$islet_enhancer_strong %>% sum(.)
+sig$liver_enhancer_strong %>% sum(.)
+sig$credible %>% sum(.)
+
+notsig <- filter(pa.df,cell=="HepG2",paSNP!=1) %>%  
+  dplyr::select(.,one_of("chrom","pos","islet_atac","islet_enhancer_strong","liver_enhancer_strong","credible"))
+notsig <- notsig[!duplicated(notsig),]
+notsig$islet_atac %>% sum(.)
+notsig$islet_enhancer_strong %>% sum(.)
+notsig$liver_enhancer_strong %>% sum(.)
+notsig$credible %>% sum(.)
+
+
+sig <- filter(pa.df,cell=="Hek293",paSNP==1) %>%  
+  dplyr::select(.,one_of("chrom","pos","islet_atac","islet_enhancer_strong","liver_enhancer_strong","credible"))
+sig <- sig[!duplicated(sig),]
+sig$islet_atac %>% sum(.)
+sig$islet_enhancer_strong %>% sum(.)
+sig$liver_enhancer_strong %>% sum(.)
+sig$credible %>% sum(.)
+
+notsig <- filter(pa.df,cell=="Hek293",paSNP!=1) %>%  
+  dplyr::select(.,one_of("chrom","pos","islet_atac","islet_enhancer_strong","liver_enhancer_strong","credible"))
+notsig <- notsig[!duplicated(notsig),]
+notsig$islet_atac %>% sum(.)
+notsig$islet_enhancer_strong %>% sum(.)
+notsig$liver_enhancer_strong %>% sum(.)
+notsig$credible %>% sum(.)
+
 ```
 
 
+SELEX SNPs
+
+```{r}
+
+sig <- filter(pb.df,pval<0.05) %>%  
+  dplyr::select(.,one_of("CHR","POS","islet_atac","islet_enhancer_strong","liver_enhancer_strong","credible"))
+sig <- sig[!duplicated(sig),]
+sig$islet_atac %>% sum(.)
+sig$islet_enhancer_strong %>% sum(.)
+sig$liver_enhancer_strong %>% sum(.)
+sig$credible %>% sum(.)
+
+
+notsig <- filter(pb.df,pval>=0.05) %>%  
+  dplyr::select(.,one_of("CHR","POS","islet_atac","islet_enhancer_strong","liver_enhancer_strong","credible"))
+notsig <- notsig[!duplicated(notsig),]
+notsig$islet_atac %>% sum(.)
+notsig$islet_enhancer_strong %>% sum(.)
+notsig$liver_enhancer_strong %>% sum(.)
+notsig$credible %>% sum(.)
+
+```
+
+Significant Hi-C loops 
+
+```{r}
+
+sig <- dplyr::select(loop.bed,one_of("CHR","POS","POS1",
+                              "islet_atac","islet_enhancer_strong","liver_enhancer_strong","credible"))
+sig <- sig[!duplicated(sig),]
+sig$islet_atac %>% sum(.)
+sig$islet_enhancer_strong %>% sum(.)
+sig$liver_enhancer_strong %>% sum(.)
+sig$credible %>% sum(.)
+
+
+# Partition 
+
+l1 <- dplyr::select(loop.bed,one_of("CHR","POS","POS1","name"))
+l2 <- filter(loop.bed,islet_atac==TRUE) %>% dplyr::select(.,one_of("CHR","POS","POS1","name"))
+l2$name <- "loop_islet_ATAC"
+l3 <- filter(loop.bed,islet_atac==FALSE) %>% dplyr::select(.,one_of("CHR","POS","POS1","name"))
+l3$name <- "loop_Not_islet_ATAC"
+l4 <- filter(loop.bed,islet_enhancer_strong==TRUE) %>% dplyr::select(.,one_of("CHR","POS","POS1","name"))
+l4$name <- "loop_islet_SE"
+l5 <- filter(loop.bed,islet_enhancer_strong==FALSE) %>% dplyr::select(.,one_of("CHR","POS","POS1","name"))
+l5$name <- "loop_Not_islet_SE"
+l6 <- filter(loop.bed,liver_enhancer_strong==TRUE) %>% dplyr::select(.,one_of("CHR","POS","POS1","name"))
+l6$name <- "loop_liver_SE"
+l7 <- filter(loop.bed,liver_enhancer_strong==FALSE) %>% dplyr::select(.,one_of("CHR","POS","POS1","name"))
+l7$name <- "loop_Not_liver_SE"
+
+loop.fgwas <- rbind(l1,l2,l3,l4,l5,l6,l7)
+write.table(x=loop.fgwas,file=bing.dir%&%"loops.bed",sep="\t",quote=FALSE,
+            row.names=FALSE)
+
+
+```
