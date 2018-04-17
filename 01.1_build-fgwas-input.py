@@ -13,7 +13,7 @@ bedtools = "/apps/well/bedtools/2.24.0/bedtools"
 cur_dir = "/well/mccarthy/users/jason/projects/ucsd_collaboration/"
 input_dir = cur_dir + "fgwas_input/"
 fgwas_head_list = ["CHR","POS0","POS","SNPID","F","Z","PVAL","NCASE","NCONTROL"] # fgwas field names for gwas columns
-annot_bed_file = "/well/mccarthy/users/jason/datasets/bing/bing.bed"
+annot_bed_file = "/well/mccarthy/users/jason/datasets/bing/loops.bed"
 gwas_bed_file = "/well/got2d/jason/reference/gwas/diamante-ukbb_hrc/ukbb_diamante-euro.bed"
 outfile = input_dir+"ukbb_diamante-euro.fgwas"
 

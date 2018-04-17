@@ -387,6 +387,17 @@ echo "end time" `date`
         return best_dropped_mod,False,model_list, best_llk, status_complete
 
 
+def step1_2():
+    sys.stdout.write("Step 1: Running each annotation separately and identifying signficant annotations\n")
+    step1()
+    sig_list = sig_annot_list() # limiting to only annotations that didn't overlap zero (log2FE) from single analysis
+
+    sys.stdout.write("Step 2: Finding the single best annotation to seed the model\n")
+    top = step2(sig_list)
+    top_annot, top_val = top[0], top[1]
+    print "Top annotation: " + str(top_annot) + " Value: " + str(top_val)
+
+
 def wrapper():
     sys.stdout.write("Step 1: Running each annotation separately and identifying signficant annotations\n")
     step1()
@@ -463,6 +474,6 @@ def wrapper():
 
 
 def main():
-    wrapper()
+    step1_2()
 
 if (__name__=="__main__"): main()
