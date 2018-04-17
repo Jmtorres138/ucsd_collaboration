@@ -18,16 +18,16 @@ library("tidyverse")
 library("gridExtra")
 library("viridis")
 
-serv.dir <- "/Users/jtorres/FUSE/"
-fgwas.dir <- serv.dir %&% "projects/t2d-integration/fgwas/diagram_hrc/cross_tissue/multi_tissue_joint_analysis/"
+
+fuse.path <- "/home/jason/science/servers/FUSE5/"
+fgwas.dir <- fuse.path %&% "projects/ucsd_collaboration/"
 fgwas.out.dir <- fgwas.dir %&% "fgwas_output/"
-best.joint.model.file.prefix <- "best-joint-model"
-plot.dir <- fgwas.dir %&% "plots/"
+plot.dir <- "/home/jason/science/projects/ucsd_collaboration/plots/"
 
 output.prefix <- "fgwas"
 my.title <- output.prefix
 
-annotation.keyfile <- plot.dir %&% "plot-key.csv"# Optional: Specifiy if you have a csv-delimited txt file with annotation names (as they appear in the fgwas input file) on the left column and plotting names on the right column, column names should be Name and PlotName, otherwise set to NULL
+annotation.keyfile <- NULL # plot.dir %&% "plot-key.csv"# Optional: Specifiy if you have a csv-delimited txt file with annotation names (as they appear in the fgwas input file) on the left column and plotting names on the right column, column names should be Name and PlotName, otherwise set to NULL
 if (!is.null(annotation.keyfile)){
   key.df <- fread(annotation.keyfile,sep=",",sep2=" ")
 }
@@ -88,7 +88,7 @@ build_param_df <- function(name.vec=NULL){
   print("There are " %&% dim(out.df)[1] %&% " annotations")
   print("There are " %&% dim(enriched)[1] %&% " annotations that are marginally ENRICHED")
   print("There are " %&% dim(depleted)[1] %&% " annotations that are marginally DEPLETED")
-  out.df <- rbind(enriched,depleted)
+  #out.df <- rbind(enriched,depleted)
   index <- as.logical(map(out.df$parameter, function(x){!(gsub("_ln","",x) %in% remove.vec)}))
   out.df <- out.df[index,]
 
@@ -96,22 +96,6 @@ build_param_df <- function(name.vec=NULL){
     out.df <- update_names(out.df,key.df)
   }
   return(out.df)
-}
-
-build_param_best_df <- function(pre){
-
-  param.df <- annot_process(pre %&% ".params")
-  param.df <- arrange(param.df,desc(estimate))
-  param.df <- filter(param.df,parameter!="pi")
-  param.df <- filter(param.df,parameter!="pi_region")
-
-  #if (!is.null(name.vec)){
-  #  param.df$parameter<-name.vec
-  #}
-  if (!is.null(annotation.keyfile)){
-    param.df <- update_names(param.df,key.df)
-  }
-  return(param.df)
 }
 
 
@@ -150,23 +134,13 @@ an_plot <- function(mydf,mytitl="",mylow=-10,myhigh=10,interval=1){
 ```{r}
 
 param.sing.df <- build_param_df()
+param.sing.df <- filter(param.sing.df,!grepl("pb_",parameter)) %>%
+  filter(.,!grepl("pa_",parameter)) %>% filter(.,parameter!="distance_tss_0_5000_ln") %>% filter(.,!grepl("point",parameter))
 plt1 <- an_plot(param.sing.df,mytitl=my.title%&%": Seperate Analysis",mylow=-5,myhigh=5,interval=1)
 plt1
-write.table(x=param.sing.df,file=plot.dir %&% output.prefix %&% ".fgwas_enrich.seperate.txt",
+write.table(x=param.sing.df,file=plot.dir %&% output.prefix %&% ".enrich.seperate.txt",
             sep="\t",quote=F,col.names=TRUE,row.names=FALSE)
-ggsave(filename=plot.dir %&% output.prefix %&% ".fgwas_enrich.seperate.png",plot=plt1,width=6,height=6)
+ggsave(filename=plot.dir %&% output.prefix %&% ".enrich.seperate.png",plot=plt1,width=6,height=6)
 
 ```
 
-# Generate plot 2 : Joint analysis of annotations in the 'Best' model
-
-```{r}
-
-param.df <- build_param_best_df(pre=fgwas.out.dir %&% best.joint.model.file.prefix)
-plt2 <- an_plot(param.df,mytitl=my.title%&%": Joint Analysis",mylow=-5,myhigh=5,interval=1)
-plt2
-write.table(x=param.df,file=plot.dir %&% output.prefix %&% ".fgwas_enrich.joint.txt",
-            sep="\t",quote=F,col.names=TRUE,row.names=FALSE)
-ggsave(filename=plot.dir %&% output.prefix %&% ".fgwas_enrich.joint.png",plot=plt2,width=6,height=6)
-
-```
