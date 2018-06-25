@@ -1,0 +1,348 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Setup 
+
+```{r}
+"%&%" <- function(a,b) paste0(a,b)
+
+library("data.table")
+library("tidyverse")
+library("GenomicRanges")
+
+fuse.path <- "/home/jason/science/servers/FUSE5/"
+work.dir <- fuse.path %&% "projects/ucsd_collaboration/"
+bing.dir <- fuse.path %&% "datasets/bing/"
+null.dir <- fuse.path %&% "projects/t2d_classification/method_A/null_results/"
+fcred.dir <- fuse.path %&% "projects/t2d_classification/method_A/islet_results/"
+null.df <- fread(null.dir %&% "null_results_func-cred-sets.txt")
+fcred.df <- fread(fcred.dir %&% "results_func-cred-sets.txt")
+
+plot.dir <- work.dir %&% "plots/"
+pa.df <- fread(bing.dir %&% "paSNP-annotated.txt")
+names(pa.df)[1:2] <- c("CHR","POS")
+pb.df <- fread(bing.dir %&% "pbSNP-annotated.txt")
+loop.df <- fread(bing.dir %&% "loop-annotated.txt")
+
+```
+
+Functions 
+
+```{r}
+
+require(scales)
+
+ p <- ggplot(mydataf, aes(x = foo)) +  
+        geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        ## version 3.0.9
+        # scale_y_continuous(labels = percent_format())
+        ## version 3.1.0
+        scale_y_continuous(labels=percent)
+
+build_plot_df <- function(cred.df,ref.df,loop=FALSE){
+  ref.gr <- GRanges(seqnames=ref.df$CHR,IRanges(ref.df$POS,ref.df$POS))
+  if (loop==TRUE){
+    ref.gr <- GRanges(seqnames=ref.df$CHR,IRanges(ref.df$POS,ref.df$POS1))
+  }
+  bin.names <- c("0-0.05","0.05-0.10","0.10-0.20","0.20-0.30","0.30-0.40",
+                 "0.40-0.50","0.50-0.60","0.60-0.70","0.70-0.80","0.80-0.90","0.90-1.0")
+  bin.list <- list(c(0,0.05),c(0.05,0.10),c(0.1,0.2),c(0.2,0.3),c(0.3,0.4),
+                   c(0.4,0.5),c(0.5,0.6),c(0.6,0.7),c(0.7,0.8),c(0.8,0.9),c(0.9,1.0))
+  out.df <- c()
+  pb <- txtProgressBar(min=0,max=length(bin.names),style=3)
+  for (i in 1:length(bin.list)){
+    setTxtProgressBar(pb,i)
+    bin <- bin.names[i]
+    l <- bin.list[[i]]
+    sub.df <- filter(cred.df,PPA>l[1],PPA<=l[2])
+    sub.df$bin <- bin
+    sub.gr <- GRanges(seqnames=sub.df$CHR,IRanges(sub.df$POS,sub.df$POS))
+    sub.df$annot <- (sub.gr %over% ref.gr)
+    out.df <- rbind(out.df,sub.df)
+  }
+  return(out.df)
+}
+
+build_prop_df <- function(cred.df,ref.df,loop=FALSE){
+  ref.gr <- GRanges(seqnames=ref.df$CHR,IRanges(ref.df$POS,ref.df$POS))
+  if (loop==TRUE){
+    ref.gr <- GRanges(seqnames=ref.df$CHR,IRanges(ref.df$POS,ref.df$POS1))
+  }
+  bin.names <- c("0-0.05","0.05-0.10","0.10-0.20","0.20-0.30","0.30-0.40",
+                 "0.40-0.50","0.50-0.60","0.60-0.70","0.70-0.80","0.80-0.90","0.90-1.0")
+  bin.list <- list(c(0,0.05),c(0.05,0.10),c(0.1,0.2),c(0.2,0.3),c(0.3,0.4),
+                   c(0.4,0.5),c(0.5,0.6),c(0.6,0.7),c(0.7,0.8),c(0.8,0.9),c(0.9,1.0))
+  out.df <- c()
+  pb <- txtProgressBar(min=0,max=length(bin.names),style=3)
+  for (i in 1:length(bin.list)){
+    setTxtProgressBar(pb,i)
+    bin <- bin.names[i]
+    l <- bin.list[[i]]
+    sub.df <- filter(cred.df,PPA>l[1],PPA<=l[2])
+    count <- dim(sub.df)[1]
+    sub.gr <- GRanges(seqnames=sub.df$CHR,IRanges(sub.df$POS,sub.df$POS))
+    annot <- (sub.gr %over% ref.gr) %>% sum(.)
+    prop <- annot/count
+    build.df <- data.frame(bin,count,prop,stringsAsFactors = FALSE)
+    out.df <- rbind(out.df,build.df)
+  }
+  return(out.df)
+}
+```
+
+
+
+```{r}
+
+plot.dir <- "/home/jason/Tempo/"
+
+df1 <- build_plot_df(null.df,filter(pb.df,pval<0.01))
+df2 <- build_prop_df(null.df,filter(pb.df,pval<0.01))
+
+plt1 <- ggplot(data=df1,aes(x=bin)) + geom_bar(aes(fill=annot)) + 
+  scale_fill_brewer(palette="Set2",name="Annotation") + theme_classic() + 
+  xlab("PPA bin") + ylab("Count")
+
+
+plt2 <- ggplot(data=df1,aes(x=bin)) + geom_bar(aes(fill=annot)) + 
+  coord_cartesian(ylim=c(0,1000)) + 
+  scale_fill_brewer(palette="Set2",name="Annotation") + theme_classic() + 
+  xlab("PPA bin") + ylab("Count")
+
+plt3 <- ggplot(data=df2,aes(x=bin,y=full)) + 
+  geom_bar(stat="identity",
+           color="grey4",fill="ghostwhite") + 
+  geom_bar(aes(x=bin,y=prop),stat="identity",
+           color="dodgerblue3",fill="dodgerblue2") +   
+  coord_cartesian(ylim=c(0,1))+
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Percentage") + coord_cartesian(ylim=c(0,1)) + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5))
+
+ggsave(x=plt1,filename = plot.dir %&% "pb_ppa_plt1.png",width=10,height=4)
+ggsave(x=plt2,filename = plot.dir %&% "pb_ppa_plt2.png",width=10,height=4)
+ggsave(x=plt3,filename = plot.dir %&% "pb_ppa_plt3.png",width=5,height=4)
+
+  
+
+```
+
+
+```{r}
+
+df1 <- build_plot_df(null.df,filter(pa.df,paSNP==1))
+df2 <- build_prop_df(null.df,filter(pa.df,paSNP==1))
+plt1 <- ggplot(data=df1,aes(x=bin)) + geom_bar(aes(fill=annot)) + 
+  scale_fill_brewer(palette="Set2",name="Annotation") + theme_classic() + 
+  xlab("PPA bin") + ylab("Count")
+plt2 <- ggplot(data=df1,aes(x=bin)) + geom_bar(aes(fill=annot)) + 
+  coord_cartesian(ylim=c(0,1000)) + 
+  scale_fill_brewer(palette="Set2",name="Annotation") + theme_classic() + 
+  xlab("PPA bin") + ylab("Count")
+
+plt3 <- ggplot(data=df2,aes(x=bin,y=prop)) + 
+  geom_bar(stat="identity",
+           color="dodgerblue4",fill="dodgerblue3") + 
+  coord_cartesian(ylim=c(0,1))+
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Count") + coord_cartesian(ylim=c(0,0.25))
+
+ggsave(x=plt1,filename = plot.dir %&% "pa_ppa_plt1.png",width=10,height=4)
+ggsave(x=plt2,filename = plot.dir %&% "pa_ppa_plt2.png",width=10,height=4)
+ggsave(x=plt3,filename = plot.dir %&% "pa_ppa_plt3.png",width=9,height=4)
+
+```
+
+```{r}
+
+df1 <- build_plot_df(null.df,loop.df,loop=TRUE)
+df2 <- build_prop_df(null.df,loop.df,loop=TRUE)
+plt1 <- ggplot(data=df1,aes(x=bin)) + geom_bar(aes(fill=annot)) + 
+  scale_fill_brewer(palette="Set2",name="Annotation") + theme_classic() + 
+  xlab("PPA bin") + ylab("Count")
+plt2 <- ggplot(data=df1,aes(x=bin)) + geom_bar(aes(fill=annot)) + 
+  coord_cartesian(ylim=c(0,1000)) + 
+  scale_fill_brewer(palette="Set2",name="Annotation") + theme_classic() + 
+  xlab("PPA bin") + ylab("Count")
+
+plt3 <- ggplot(data=df2,aes(x=bin,y=prop)) + 
+  geom_bar(stat="identity",
+           color="dodgerblue4",fill="dodgerblue3") + 
+  coord_cartesian(ylim=c(0,1))+
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Count") + coord_cartesian(ylim=c(0,0.25))
+
+ggsave(x=plt1,filename = plot.dir %&% "loop_ppa_plt1.png",width=10,height=4)
+ggsave(x=plt2,filename = plot.dir %&% "loop_ppa_plt2.png",width=10,height=4)
+ggsave(x=plt3,filename = plot.dir %&% "loop_ppa_plt3.png",width=9,height=4)
+
+```
+
+
+## REVISION 
+
+
+
+
+```{r}
+
+df <- fread(plot.dir %&% "CNN_FGWAS_by_HRC_PPA_bin.txt")
+df2$bin <- gsub("0-0.05","0.00-0.05",df2$bin)
+df2$bin <- gsub("0.90-1.0","0.90-1.00",df2$bin)
+
+sub <- dplyr::select(df2,one_of("bin","prop"))
+names(sub) <- c("PPA_bin","selex")
+plot.df <- inner_join(df,sub,by="PPA_bin") %>% arrange(.,PPA_bin)
+plot.df$full <- 1
+```
+
+
+
+```{r}
+
+library("grid");library("gridExtra")
+library(viridis)
+cols <- viridis(10)
+
+plt1 <- ggplot(data=plot.df,aes(x=PPA_bin,y=full)) + 
+  geom_bar(stat="identity",
+           color="grey1",fill="ghostwhite") + 
+  geom_bar(aes(x=PPA_bin,y=selex),
+           stat="identity",fill=cols[1]) +   
+  coord_cartesian(ylim=c(0,1))+
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Proportion") + coord_cartesian(ylim=c(0,1)) + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5)) + 
+  ggtitle("SELEX")
+
+plt2 <- ggplot(data=plot.df,aes(x=PPA_bin,y=full)) + 
+  geom_bar(stat="identity",
+           color="grey1",fill="ghostwhite") + 
+  geom_bar(aes(x=PPA_bin,y=pc_fgwas_up),
+           stat="identity",fill=cols[4]) +   
+  coord_cartesian(ylim=c(0,1))+
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Proportion") + coord_cartesian(ylim=c(0,1)) + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5)) + 
+  ggtitle("fgwas")
+
+plt3 <- ggplot(data=plot.df,aes(x=PPA_bin,y=full)) + 
+  geom_bar(stat="identity",
+           color="grey1",fill="ghostwhite") + 
+  geom_bar(aes(x=PPA_bin,y=pc_CNN_e0.05),
+           stat="identity",fill=cols[6]) +   
+  coord_cartesian(ylim=c(0,1))+
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Proportion") + coord_cartesian(ylim=c(0,1)) + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5)) + 
+  ggtitle("CNN")
+
+
+
+
+
+#ggsave(x=plt1,filename = plot.dir %&% "SELEX.png",width=5,height=4)
+
+
+```
+
+
+```{r}
+
+gen.dir <- fuse.path %&%
+  "projects/t2d_classification/method_C/genetic_credible_sets/"
+cred.df <- fread(gen.dir %&% "gencred.txt")
+
+build_snpcount_df <- function(cred.df){
+  bin.names <- c("0.00-0.05","0.05-0.10","0.10-0.20","0.20-0.30","0.30-0.40",
+                 "0.40-0.50","0.50-0.60","0.60-0.70","0.70-0.80",
+                 "0.80-0.90","0.90-1.00")
+  bin.list <- list(c(0,0.05),c(0.05,0.10),c(0.1,0.2),c(0.2,0.3),c(0.3,0.4),
+                   c(0.4,0.5),c(0.5,0.6),c(0.6,0.7),c(0.7,0.8),
+                   c(0.8,0.9),c(0.9,1.0))
+  out.df <- c()
+  pb <- txtProgressBar(min=0,max=length(bin.names),style=3)
+  for (i in 1:length(bin.list)){
+    setTxtProgressBar(pb,i)
+    bin <- bin.names[i]
+    l <- bin.list[[i]]
+    sub.df <- filter(cred.df,PPA>l[1],PPA<=l[2])
+    count <- dim(sub.df)[1]
+    count.prop <- count / dim(cred.df)[1]
+    build.df <- data.frame(bin,count,count.prop,stringsAsFactors = FALSE)
+    out.df <- rbind(out.df,build.df)
+  }
+  return(out.df)
+}
+
+
+df4 <- build_snpcount_df(cred.df) 
+names(df4) <- c("PPA_bin","Count","count_prop")
+plot.df <- inner_join(plot.df,df4,by="PPA_bin")
+
+plt4 <- ggplot(data=plot.df,aes(x=PPA_bin,y=count_prop)) + 
+  geom_bar(stat="identity",fill="grey",color="black") +  
+  geom_text(aes(x=PPA_bin,y=count_prop+0.05,label=Count)) + 
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Proportion") + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5)) + 
+  ggtitle("SNP Count")
+
+
+```
+
+
+
+
+```{r}
+
+plt <- grid.arrange(plt4,plt1,plt2,plt3,nrow=4)
+grid.draw(plt)
+
+```
+
+## Abbrogation 
+
+```{r}
+plt1a <- ggplot(data=plot.df) + 
+  geom_bar(aes(x=PPA_bin,y=selex),
+           stat="identity",fill=cols[1]) +   
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Proportion") + coord_cartesian(ylim=c(0,0.6)) + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5)) + 
+  ggtitle("SELEX")
+
+plt2a <- ggplot(data=plot.df) + 
+  geom_bar(aes(x=PPA_bin,y=pc_fgwas_up),
+           stat="identity",fill=cols[4]) +   
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Proportion") + coord_cartesian(ylim=c(0,0.6)) + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5)) + 
+  ggtitle("fgwas")
+
+plt3a <- ggplot(data=plot.df) + 
+  geom_bar(aes(x=PPA_bin,y=pc_CNN_e0.05),
+           stat="identity",fill=cols[6]) +   
+  theme_classic() + 
+  xlab("PPA bin") + ylab("Proportion") + coord_cartesian(ylim=c(0,0.6)) + 
+  theme(axis.text.x=element_text(angle=-30,vjust=0.5)) + 
+  ggtitle("CNN")
+
+
+```
+
+```{r}
+
+plta <- grid.arrange(plt4,plt1a,plt2a,plt3a,nrow=4)
+grid.draw(plta)
+```
+
+
+
